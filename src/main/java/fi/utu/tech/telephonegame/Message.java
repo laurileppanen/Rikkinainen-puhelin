@@ -1,5 +1,7 @@
 package fi.utu.tech.telephonegame;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.util.UUID;
 
 /**
@@ -23,16 +25,56 @@ import java.util.UUID;
  * 
  */
 
-public final class Message  {
+public final class Message implements Serializable {
+	// SerialVersionUID arvoa käytetään versionhallintaan serialisoinnissa
+	@Serial
+	private static final long serialVersionUID = 1L;
 
-	// TODO: Missing attributes
+	private UUID id;
+	private String message;
+	private Integer color;
 
+	// Constructor for creating a new Message with a new UUID
 	public Message(String message, Integer color) {
 		this(UUID.randomUUID(), message, color);
 	}
 
+	// Constructor for creating a Message with a specific UUID
 	public Message(UUID id, String message, Integer color) {
-		// TODO
+		this.id = id;
+		this.message = message;
+		this.color = color;
 	}
 
+	public UUID getId() {
+		return id;
+	}
+
+	public String getMessage() {
+		return message;
+	}
+
+	public Integer getColor() {
+		return color;
+	}
+
+	public void setId(UUID id) {
+		this.id = id;
+	}
+
+	public void setColor(Integer color) {
+		this.color = color;
+	}
+
+	public void setMessage(String message) {
+		this.message = message;
+	}
+
+	@Override
+	public String toString() {
+		return "Message{" + "id=" + id +
+				", message='" + message + '\'' +
+				", color=" + color +
+				'}';
+	}
 }
