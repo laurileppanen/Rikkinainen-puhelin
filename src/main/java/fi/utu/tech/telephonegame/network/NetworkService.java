@@ -8,8 +8,11 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 
 /**
@@ -26,7 +29,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class NetworkService extends Thread implements Network {
 
 	private ServerSocket serverSocket;
-	private List<Socket> clientSockets = new ArrayList<>();
+	private List<Socket> clientSockets = new CopyOnWriteArrayList<>();
 	private ConcurrentLinkedQueue<Object> messageQueue = new ConcurrentLinkedQueue<>();
 	private ConcurrentLinkedQueue<Object> sendQueue = new ConcurrentLinkedQueue<>();
 
@@ -35,6 +38,7 @@ public class NetworkService extends Thread implements Network {
 	 */
 	public NetworkService() {
 		this.start();
+
 	}
 
 	/**
@@ -57,7 +61,10 @@ public class NetworkService extends Thread implements Network {
 				while (!serverSocket.isClosed()) {
 					try {
 						Socket clientSocket = serverSocket.accept();
+						new Thread(() -> handleIncomingMessages()).start();
+
 						clientSockets.add(clientSocket);
+
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
@@ -77,20 +84,39 @@ public class NetworkService extends Thread implements Network {
 	 * @param peerIP   The IP address to connect to
 	 * @param peerPort The TCP port to connect to
 	 */
-	public void connect(String peerIP, int peerPort) throws IOException, UnknownHostException {
+	public synchronized void connect(String peerIP, int peerPort) throws IOException, UnknownHostException {
 		System.out.printf("I should connect myself to %s, TCP port %d%n", peerIP, peerPort);
 
 		Socket peerSocket = new Socket(peerIP, peerPort);
 		clientSockets.add(peerSocket);
-		new Thread(() -> handleIncomingMessages(peerSocket)).start();
-	}
 
-	public void handleIncomingMessages(Socket clientSocket) {
+		new Thread(() -> handleIncomingMessages()).start();
+
+
+		if (!sendQueue.isEmpty()) {
+			Serializable message = (Serializable) sendQueue.poll();
+			new Thread(() -> sendToNeighbours(message)).start();
+
+		}
+	}
+	private Map<Socket, ObjectInputStream> inputStreams = new HashMap<>();
+	private Map<Socket, ObjectOutputStream> outputStreams = new HashMap<>();
+
+	public synchronized void handleIncomingMessages() {//
 		try {
-			ObjectInputStream ois = new ObjectInputStream(clientSocket.getInputStream());
-			while (!clientSocket.isClosed()) {
-				Object message = ois.readObject();
-				messageQueue.add(message);
+			for (Socket socket : clientSockets) {
+				ObjectInputStream ois = inputStreams.get(socket);
+				System.out.println(ois);
+
+				if (ois == null) {
+					ois = new ObjectInputStream(socket.getInputStream());
+					inputStreams.put(socket, ois);
+				}
+
+				while (!socket.isClosed()) {
+					Object message = ois.readObject();
+					messageQueue.add(message);
+				}
 			}
 		} catch (IOException | ClassNotFoundException e) {
 			e.printStackTrace();
@@ -107,14 +133,22 @@ public class NetworkService extends Thread implements Network {
 		// Send the object to all neighbouring nodes
 		for (Socket socket : clientSockets) {
 			try {
-				ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
-				oos.writeObject(out);
-				oos.flush();
+				ObjectOutputStream oos_client = outputStreams.get(socket);
+
+				if ( oos_client == null){
+					oos_client = new ObjectOutputStream(socket.getOutputStream());
+					outputStreams.put(socket, oos_client);
+				}
+
+				oos_client.writeObject(out);
+				oos_client.flush();
+
+
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
-	}
+	}                                           
 	
 	/**
 	 * Add an object to the queue for sending it to the peer network (all neighbours)
@@ -128,6 +162,7 @@ public class NetworkService extends Thread implements Network {
 	 */
 	public void postMessage(Serializable out) {
 		sendQueue.add(out);
+
 	}
 
 	/**

@@ -2,6 +2,8 @@ package fi.utu.tech.telephonegame;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import fi.utu.tech.telephonegame.network.Network;
 import fi.utu.tech.telephonegame.network.NetworkService;
@@ -37,6 +39,8 @@ public class MessageBroker extends Thread {
     // This might come in handy
     private ConcurrentExpiringHashSet<UUID> prevMessages = new ConcurrentExpiringHashSet<UUID>(1000, 5000);
 
+    private List<UUID> oldMessageIds = new ArrayList<UUID>();
+
     /*
      * No need to edit the constructor
      */
@@ -62,7 +66,7 @@ public class MessageBroker extends Thread {
      * @return The message processed in the aforementioned ways
      *
      */
-    private Message process(Object procMessage) {
+    private synchronized Message process(Object procMessage) {
         if (procMessage instanceof Message message) {
             if (!prevMessages.containsKey(message.getId())) {
                 prevMessages.put(message.getId());
@@ -101,8 +105,10 @@ public class MessageBroker extends Thread {
         while (true) {
             try {
                 Object received = network.retrieveMessage();
+
                 if (received != null) {
                     Message processedMessage = process(received);
+
                     if (processedMessage != null) {
                         send(processedMessage);
                     }
@@ -120,10 +126,12 @@ public class MessageBroker extends Thread {
      * You need to make changes here
      * @param message The Message object to be sent
      */
-    public void send(Message message) {
-        if (message != null) {
+    public synchronized void send(Message message) {
+        System.out.println(prevMessages);
+        if (message != null && !prevMessages.containsKey(message.getId())) {
             network.postMessage(message);
         }
+
 
     }
 
