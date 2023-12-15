@@ -29,9 +29,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class NetworkService extends Thread implements Network {
 
 	private ServerSocket serverSocket;
-	private List<Socket> clientSockets = new CopyOnWriteArrayList<>();
+	private List<PeerHandler> clientSockets = new CopyOnWriteArrayList<>();
 	private ConcurrentLinkedQueue<Object> messageQueue = new ConcurrentLinkedQueue<>();
-	private ConcurrentLinkedQueue<Object> sendQueue = new ConcurrentLinkedQueue<>();
+	private ConcurrentLinkedQueue<Serializable> sendQueue = new ConcurrentLinkedQueue<>();
 
 	/*
 	 * No need to change the construtor
@@ -61,9 +61,10 @@ public class NetworkService extends Thread implements Network {
 				while (!serverSocket.isClosed()) {
 					try {
 						Socket clientSocket = serverSocket.accept();
-						new Thread(() -> handleIncomingMessages()).start();
+						PeerHandler peer = new PeerHandler(clientSocket, messageQueue);
+						new Thread(peer).start();
 
-						clientSockets.add(clientSocket);
+						clientSockets.add(peer);
 
 					} catch (IOException e) {
 						e.printStackTrace();
@@ -88,40 +89,15 @@ public class NetworkService extends Thread implements Network {
 		System.out.printf("I should connect myself to %s, TCP port %d%n", peerIP, peerPort);
 
 		Socket peerSocket = new Socket(peerIP, peerPort);
-		clientSockets.add(peerSocket);
 
-		new Thread(() -> handleIncomingMessages()).start();
-
-
-		if (!sendQueue.isEmpty()) {
-			Serializable message = (Serializable) sendQueue.poll();
-			new Thread(() -> sendToNeighbours(message)).start();
-
-		}
+		PeerHandler peer = new PeerHandler(peerSocket, messageQueue);
+		clientSockets.add(peer);
+		new Thread(peer).start();
 	}
+
 	private Map<Socket, ObjectInputStream> inputStreams = new HashMap<>();
 	private Map<Socket, ObjectOutputStream> outputStreams = new HashMap<>();
 
-	public synchronized void handleIncomingMessages() {//
-		try {
-			for (Socket socket : clientSockets) {
-				ObjectInputStream ois = inputStreams.get(socket);
-				System.out.println(ois);
-
-				if (ois == null) {
-					ois = new ObjectInputStream(socket.getInputStream());
-					inputStreams.put(socket, ois);
-				}
-
-				while (!socket.isClosed()) {
-					Object message = ois.readObject();
-					messageQueue.add(message);
-				}
-			}
-		} catch (IOException | ClassNotFoundException e) {
-			e.printStackTrace();
-		}
-	}
 
 	/**
 	 * This method is used to send the message to all connected neighbours (directly connected nodes)
@@ -131,22 +107,8 @@ public class NetworkService extends Thread implements Network {
 	 */
 	private void sendToNeighbours(Serializable out) {
 		// Send the object to all neighbouring nodes
-		for (Socket socket : clientSockets) {
-			try {
-				ObjectOutputStream oos_client = outputStreams.get(socket);
-
-				if ( oos_client == null){
-					oos_client = new ObjectOutputStream(socket.getOutputStream());
-					outputStreams.put(socket, oos_client);
-				}
-
-				oos_client.writeObject(out);
-				oos_client.flush();
-
-
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		for (PeerHandler peer : clientSockets) {
+			peer.send(out);
 		}
 	}                                           
 	
@@ -190,14 +152,9 @@ public class NetworkService extends Thread implements Network {
 	 */
 	public void run() {
 		while (true) {
-			try {
-				if (!sendQueue.isEmpty()) {
-					Serializable message = (Serializable) sendQueue.poll();
-					sendToNeighbours(message);
-				}
-				Thread.sleep(100);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			if (!sendQueue.isEmpty()) {
+				Serializable message = (Serializable) sendQueue.poll();
+				sendToNeighbours(message);
 			}
 		}
 	}

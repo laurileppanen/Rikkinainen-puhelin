@@ -39,7 +39,6 @@ public class MessageBroker extends Thread {
     // This might come in handy
     private ConcurrentExpiringHashSet<UUID> prevMessages = new ConcurrentExpiringHashSet<UUID>(1000, 5000);
 
-    private List<UUID> oldMessageIds = new ArrayList<UUID>();
 
     /*
      * No need to edit the constructor
@@ -52,7 +51,7 @@ public class MessageBroker extends Thread {
     /**
      * Processes message
      *
-     * In the the process method you need to:
+     * In the process method you need to:
      * 1. Test the type of the incoming object
      * 2. Keep track of messages that are alredy processed by this node
      * 3. Show the incoming message in the received message text area (GuiIO)
@@ -127,8 +126,8 @@ public class MessageBroker extends Thread {
      * @param message The Message object to be sent
      */
     public synchronized void send(Message message) {
-        System.out.println(prevMessages);
-        if (message != null && !prevMessages.containsKey(message.getId())) {
+
+        if (message != null ) {
             network.postMessage(message);
         }
 
@@ -143,6 +142,7 @@ public class MessageBroker extends Thread {
      */
     public void send(String text) {
         Message message = new Message(text, 0);
+        prevMessages.put(message.getId());
         this.send(message);
     }
 
