@@ -67,8 +67,8 @@ public class MessageBroker extends Thread {
      */
     private synchronized Message process(Object procMessage) {
         if (procMessage instanceof Message message) {
-            if (!prevMessages.containsKey(message.getId())) {
-                prevMessages.put(message.getId());
+
+            if (message.getId() != null && !prevMessages.containsKey(message.getId())) {
 
                 // Asetetaan vastaanotettu viesti käyttöliittymään
                 gui_io.setReceivedMessage(message.getMessage());
@@ -82,8 +82,12 @@ public class MessageBroker extends Thread {
                 gui_io.setSignal(refinedColor);
 
                 // palautus
-                return new Message(refinedText, refinedColor);
+                message.setMessage(refinedText);
+                message.setColor(refinedColor);
+                prevMessages.put(message.getId());
+                return message;
             }
+            System.out.println(prevMessages);
         }
         return null;
     }
@@ -126,12 +130,10 @@ public class MessageBroker extends Thread {
      * @param message The Message object to be sent
      */
     public synchronized void send(Message message) {
-
         if (message != null ) {
             network.postMessage(message);
+            prevMessages.put(message.getId());
         }
-
-
     }
 
     /**

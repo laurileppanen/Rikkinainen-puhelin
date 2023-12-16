@@ -13,6 +13,14 @@ public class PeerHandler implements Runnable {
 
     public PeerHandler(Socket socket, ConcurrentLinkedQueue<Object> messageQueue){
         this.socket = socket;
+        this.messageQueue = messageQueue;
+
+        try {
+            oos = new ObjectOutputStream(socket.getOutputStream());
+            ois = new ObjectInputStream(socket.getInputStream());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
     public void send(Serializable obj){
         try {
@@ -26,11 +34,9 @@ public class PeerHandler implements Runnable {
     @Override
     public void run() {
         try {
-            ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
-            ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
 
             while (!socket.isClosed()) {
-                Object message = ois.readObject();
+                Object message = (Serializable) ois.readObject();
                 messageQueue.add(message);
             }
 
