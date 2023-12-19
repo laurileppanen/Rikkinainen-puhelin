@@ -11,8 +11,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 
 
 /**
@@ -30,8 +32,10 @@ public class NetworkService extends Thread implements Network {
 
 	private ServerSocket serverSocket;
 	private List<PeerHandler> clientSockets = new CopyOnWriteArrayList<>();
-	private ConcurrentLinkedQueue<Object> messageQueue = new ConcurrentLinkedQueue<>();
-	private ConcurrentLinkedQueue<Serializable> sendQueue = new ConcurrentLinkedQueue<>();
+	BlockingQueue<Serializable> messageQueue = new LinkedBlockingQueue<>();
+
+	BlockingQueue<Serializable> sendQueue = new LinkedBlockingQueue<>();
+
 
 	/*
 	 * No need to change the construtor
@@ -137,7 +141,7 @@ public class NetworkService extends Thread implements Network {
 	 * @return The next message
 	 */
 	public Object retrieveMessage() throws InterruptedException {
-		return messageQueue.poll();
+		return messageQueue.take();
 	}
 
 	/**
@@ -152,10 +156,14 @@ public class NetworkService extends Thread implements Network {
 	 */
 	public void run() {
 		while (true) {
-			if (!sendQueue.isEmpty()) {
-				Serializable message = (Serializable) sendQueue.poll();
-				sendToNeighbours(message);
+			Serializable message = null;
+			try {
+				message = (Serializable) sendQueue.take();
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
 			}
+			sendToNeighbours(message);
+
 		}
 	}
 

@@ -65,7 +65,7 @@ public class MessageBroker extends Thread {
      * @return The message processed in the aforementioned ways
      *
      */
-    private synchronized Message process(Object procMessage) {
+    private Message process(Object procMessage) {
         if (procMessage instanceof Message message) {
 
             if (message.getId() != null && !prevMessages.containsKey(message.getId())) {
@@ -129,7 +129,7 @@ public class MessageBroker extends Thread {
      * You need to make changes here
      * @param message The Message object to be sent
      */
-    public synchronized void send(Message message) {
+    public void send(Message message) {
         if (message != null ) {
             network.postMessage(message);
             prevMessages.put(message.getId());

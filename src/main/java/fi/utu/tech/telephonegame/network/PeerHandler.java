@@ -4,14 +4,15 @@ import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class PeerHandler implements Runnable {
     private Socket socket;
     private ObjectInputStream ois;
     private ObjectOutputStream oos;
-    private ConcurrentLinkedQueue<Object> messageQueue;
+    private BlockingQueue<Serializable> messageQueue;
 
-    public PeerHandler(Socket socket, ConcurrentLinkedQueue<Object> messageQueue){
+    public PeerHandler(Socket socket, BlockingQueue<Serializable> messageQueue){
         this.socket = socket;
         this.messageQueue = messageQueue;
 
@@ -36,7 +37,7 @@ public class PeerHandler implements Runnable {
         try {
 
             while (!socket.isClosed()) {
-                Object message = (Serializable) ois.readObject();
+                Serializable message = (Serializable) ois.readObject();
                 messageQueue.add(message);
             }
 
